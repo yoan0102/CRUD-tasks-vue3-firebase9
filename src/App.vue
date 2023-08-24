@@ -1,17 +1,42 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { db } from '@/config/firebase'
-import { collection, getDocs, addDoc } from 'firebase/firestore'
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  updateDoc,
+  query,
+  orderBy
+} from 'firebase/firestore'
+
+const q = query(collection(db, 'tasks'), orderBy('date', 'desc'))
+
 const todos = ref([])
 
-onMounted(async () => {
-  const querySnapshot = await getDocs(collection(db, 'taks'))
-  querySnapshot.forEach((doc) => {
-    todos.value.push({
-      id: doc.id,
-      body: doc.data().body,
-      done: doc.data().done
+onMounted(() => {
+  // const querySnapshot = await getDocs(collection(db, 'taks'))
+  // querySnapshot.forEach((doc) => {
+  //   todos.value.push({
+  //     id: doc.id,
+  //     body: doc.data().body,
+  //     done: doc.data().done
+  //   })
+  // })
+
+  onSnapshot(q, (querySnapshot) => {
+    const tasks = []
+
+    querySnapshot.forEach((doc) => {
+      tasks.push({
+        id: doc.id,
+        body: doc.data().body,
+        done: doc.data().done
+      })
     })
+    todos.value = tasks
   })
 })
 
@@ -23,31 +48,30 @@ const addTodo = async () => {
   if (newTodoBody.value.trim() === '') return
   const newTodo = {
     body: newTodoBody.value,
-    done: false
+    done: false,
+    date: Date.now()
   }
-  const docRef = await addDoc(collection(db, 'taks'), newTodo)
-  console.log(docRef)
+  await addDoc(collection(db, 'tasks'), newTodo)
 
   newTodoBody.value = ''
-  nextTick()
 }
 
 /*
   delete todo
 */
 
-const deleteTodo = (id) => {
-  todos.value = todos.value.filter((todo) => todo.id !== id)
+const deleteTodo = async (id) => {
+  await deleteDoc(doc(db, 'tasks', id))
 }
 
 /*
   Completed Todo
 */
 
-const completeTodo = (id) => {
-  const index = todos.value.findIndex((todo) => todo.id === id)
-  const { done } = todos.value[index]
-  todos.value[index] = { ...todos.value[index], done: !done }
+const completeTodo = async (todo) => {
+  await updateDoc(doc(db, 'tasks', todo.id), {
+    done: !todo.done
+  })
 }
 </script>
 
@@ -97,7 +121,7 @@ const completeTodo = (id) => {
               <button
                 class="button"
                 :class="todo.done ? 'is-success' : 'is-light'"
-                @click="completeTodo(todo.id)"
+                @click="completeTodo(todo)"
               >
                 &check;
               </button>
